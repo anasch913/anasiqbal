@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Build Pakistan's Budget Simulator</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Chart.js for comparative visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+
+    <!-- Header -->
+    <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-emerald-400 tracking-wide">💼 Finance Minister Simulator</h1>
+                <p class="text-xs text-gray-400 mt-0.5">Base Year: Fiscal Year 2026-27 | Create your proposal blind, then compare.</p>
+            </div>
+            <div class="bg-gray-800 border border-gray-700 px-4 py-2 rounded-xl text-center">
+                <span class="text-xs uppercase tracking-wider text-gray-400 block">Total Target Outlay Pool</span>
+                <span class="text-xl font-black text-white" id="total-outlay-display">PKR 0 Bn</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left Column: Budget Builder -->
+        <div class="lg:col-span-7 space-y-6">
+            <div class="bg-gray-800/60 border border-gray-800 rounded-2xl p-6 backdrop-blur">
+                <h2 class="text-lg font-semibold text-white mb-2">Draft Your Allocations</h2>
+                <p class="text-sm text-gray-400 mb-6">Distribute the money based on your own national vision. True national actuals are masked until submission.</p>
+                
+                <!-- Allocation Trackers -->
+                <div class="grid grid-cols-2 gap-4 mb-6 p-4 rounded-xl bg-gray-950/50 border border-gray-800">
+                    <div>
+                        <span class="text-xs text-gray-400 block">Your Current Total Allocation</span>
+                        <span id="user-total-display" class="text-lg font-bold text-white">PKR 0 Bn</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-gray-400 block">Unallocated / Deficit Balance</span>
+                        <span id="remaining-display" class="text-lg font-bold text-emerald-400">PKR 0 Bn</span>
+                    </div>
+                </div>
+
+                <!-- Sliders Container -->
+                <div id="sliders-container" class="space-y-5"></div>
+
+                <!-- Submission Controller -->
+                <div class="mt-8 pt-6 border-t border-gray-800 flex justify-end">
+                    <button id="submit-btn" onclick="revealComparison()" class="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold px-8 py-3 rounded-xl transition duration-200 cursor-pointer shadow-lg shadow-emerald-500/10">
+                        🚀 Submit Budget to Cabinet
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Locked/Unlocked Comparison Panels -->
+        <div class="lg:col-span-5">
+            
+            <!-- BEFORE SUBMISSION: Locked State Placeholder -->
+            <div id="locked-panel" class="bg-gray-800/40 border border-dashed border-gray-700 rounded-2xl p-8 text-center flex flex-col justify-center items-center h-full min-h-[400px]">
+                <div class="text-4xl mb-3">🔒</div>
+                <h3 class="text-lg font-semibold text-gray-200">Comparison Dashboard Locked</h3>
+                <p class="text-xs text-gray-400 max-w-xs mx-auto mt-2 leading-relaxed">
+                    Finalize your custom portfolio adjustments and click "Submit Budget" to unveil the official government comparison charts and impact metrics.
+                </p>
+            </div>
+
+            <!-- AFTER SUBMISSION: Revealed Review Dashboard -->
+            <div id="unlocked-panel" class="hidden bg-gray-800/60 border border-gray-800 rounded-2xl p-6 backdrop-blur sticky top-24 space-y-6">
+                <div>
+                    <h3 class="text-lg font-semibold text-white">How Your Plan Compares</h3>
+                    <p class="text-xs text-gray-400">Side-by-side alignment against Pakistan's official FY2026 national budget layout.</p>
+                </div>
+                
+                <!-- Live Chart canvas context -->
+                <div class="w-full h-[280px]">
+                    <canvas id="comparisonChart"></canvas>
+                </div>
+
+                <hr class="border-gray-800">
+
+                <!-- Insights Feed -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-3">Cabinet Analysis & Briefing</h4>
+                    <div id="insights-feed" class="space-y-3 max-h-[220px] overflow-y-auto pr-2 text-sm text-gray-300">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // EDITABLE SOURCE MATRIX DATA ARRAY
+        // ==========================================
+        const TOTAL_OUTLAY = 18771; 
+
+        const BUDGET_DATA_2026 = [
+            { id: "debt", name: "Debt Servicing (Markup Payments)", actual: 8054, userAlloc: 0, min: 0, max: 12000, insight: "Debt servicing is non-negotiable without a sovereign restructure. The government must allocate over 40% here just to avoid technical default status." },
+            { id: "defence", name: "Defence & Security Outlays", actual: 3000, userAlloc: 0, min: 0, max: 6000, insight: "Defence forms a significant chunk of fixed structural spending due to national security commitments." },
+            { id: "development", name: "Federal PSDP (Development)", actual: 1000, userAlloc: 0, min: 0, max: 4000, insight: "Development investments stimulate structural infrastructure. Lowering this stunts long-term economic expansion capacity." },
+            { id: "subsidies", name: "Energy & Commodity Subsidies", actual: 1091, userAlloc: 0, min: 0, max: 3000, insight: "Subsidies cushion vulnerable populations against rising bills, but broad untargeted reliefs bleed the national treasury dry." },
+            { id: "social", name: "Social Protection (BISP)", actual: 838, userAlloc: 0, min: 0, max: 2500, insight: "Direct poverty alleviation via BISP protects lowest-income cohorts from immediate macroeconomic adjustments." },
+            { id: "administration", name: "Civil Governance & Civil Pensions", actual: 2240, userAlloc: 0, min: 0, max: 4500, insight: "This covers operational government salary packages and retirement commitments. It is a rigid bureaucratic operational cost." },
+            { id: "social_sectors", name: "Agriculture, Healthcare & Education", actual: 2548, userAlloc: 0, min: 0, max: 6000, insight: "Critical pillars of human capital. Boosting this accelerates human potential indices, health systems, and national literacy levels." }
+        ];
+
+        let hasSubmitted = false;
+        let chartInstance = null;
+
+        function initApp() {
+            document.getElementById('total-outlay-display').innerText = `PKR ${TOTAL_OUTLAY.toLocaleString()} Bn`;
+            const container = document.getElementById('sliders-container');
+            container.innerHTML = '';
+
+            BUDGET_DATA_2026.forEach((sector, index) => {
+                const card = document.createElement('div');
+                card.className = "p-4 bg-gray-900/40 rounded-xl border border-gray-800/80 space-y-3";
+                card.innerHTML = `
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="font-medium text-gray-200">${sector.name}</span>
+                        <span class="font-bold text-emerald-400" id="val-${sector.id}">PKR 0 Bn</span>
+                    </div>
+                    <input 
+                        type="range" 
+                        min="${sector.min}" 
+                        max="${sector.max}" 
+                        value="0" 
+                        class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                        oninput="updateAllocation(${index}, this.value)"
+                    />
+                `;
+                container.appendChild(card);
+            });
+
+            recalculateBudget();
+        }
+
+        function updateAllocation(index, val) {
+            BUDGET_DATA_2026[index].userAlloc = parseInt(val);
+            document.getElementById(`val-${BUDGET_DATA_2026[index].id}`).innerText = `PKR ${parseInt(val).toLocaleString()} Bn`;
+            recalculateBudget();
+        }
+
+        function recalculateBudget() {
+            const userTotal = BUDGET_DATA_2026.reduce((acc, curr) => acc + curr.userAlloc, 0);
+            const balance = TOTAL_OUTLAY - userTotal;
+
+            document.getElementById('user-total-display').innerText = `PKR ${userTotal.toLocaleString()} Bn`;
+            
+            const remainingDisplay = document.getElementById('remaining-display');
+            if (balance >= 0) {
+                remainingDisplay.innerText = `PKR ${balance.toLocaleString()} Bn Left`;
+                remainingDisplay.className = "text-lg font-bold text-emerald-400";
+            } else {
+                remainingDisplay.innerText = `Deficit: PKR ${Math.abs(balance).toLocaleString()} Bn`;
+                remainingDisplay.className = "text-lg font-bold text-red-400";
+            }
+
+            if (hasSubmitted) {
+                updateChartData();
+                updateInsights(balance);
+            }
+        }
+
+        // Action Trigger: Unveils Comparative Mode
+        function revealComparison() {
+            hasSubmitted = true;
+            
+            // Adjust panel visibilities
+            document.getElementById('locked-panel').classList.add('hidden');
+            document.getElementById('unlocked-panel').classList.remove('hidden');
+            
+            // Render the evaluation tools
+            initChart();
+            recalculateBudget();
+            
+            // Smooth view scroll adjustment for smaller viewport profiles
+            document.getElementById('unlocked-panel').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            
+            // Using a side-by-side grouped horizontal bar chart for immediate visual contrast
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: BUDGET_DATA_2026.map(s => s.name.split(' (')[0]), // Shorten titles slightly for formatting
+                    datasets: [
+                        {
+                            label: 'Your Budget',
+                            data: BUDGET_DATA_2026.map(s => s.userAlloc),
+                            backgroundColor: '#10b981', // Emerald
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'Actual Budget',
+                            data: BUDGET_DATA_2026.map(s => s.actual),
+                            backgroundColor: '#4b5563', // Muted Gray
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y', // Flips to horizontal for readable category names
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#f3f4f6' } }
+                    },
+                    scales: {
+                        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } },
+                        y: { grid: { display: false }, ticks: { color: '#e5e7eb' } }
+                    }
+                }
+            });
+        }
+
+        function updateChartData() {
+            if (chartInstance) {
+                chartInstance.data.datasets[0].data = BUDGET_DATA_2026.map(s => s.userAlloc);
+                chartInstance.update();
+            }
+        }
+
+        function updateInsights(balance) {
+            const feed = document.getElementById('insights-feed');
+            feed.innerHTML = '';
+
+            // Evaluation Threshold Blocks
+            if (balance < -500) {
+                createInsightItem("⚠️ Severe Fiscal Deficit", "Your spending model creates a deep deficit loop. In practice, this would require massive external borrowing or emergency IMF support, driving inflationary shifts.", "border-red-900 bg-red-950/20 text-red-300");
+            } else if (balance > 500) {
+                createInsightItem("ℹ️ Unutilized Capital Reserves", "You've run an aggressive surplus. While safe on paper, keeping essential development pools locked back underfunds urgent public infrastructure growth.", "border-amber-950 bg-amber-950/20 text-amber-300");
+            } else {
+                createInsightItem("✅ Macroeconomic Balance Achieved", "Exceptional balancing skill! You managed to tie up the outlays perfectly with incoming revenue limitations.", "border-emerald-900 bg-emerald-950/20 text-emerald-300");
+            }
+
+            // Discovered Variance Comparison Analysis Checks
+            BUDGET_DATA_2026.forEach(s => {
+                const diff = s.userAlloc - s.actual;
+                const percentVariance = (diff / s.actual) * 100;
+
+                if (Math.abs(percentVariance) > 20) {
+                    if (diff > 0) {
+                        createInsightItem(`📈 Ambitious Push: ${s.name}`, `You allocated significantly more than the actual state layout. ${s.insight}`, "border-gray-800 bg-gray-900/50 text-gray-300");
+                    } else {
+                        createInsightItem(`📉 Fiscal Cuts: ${s.name}`, `You underspent compared to real state allocations. Consider the trade-offs: ${s.insight}`, "border-gray-800 bg-gray-900/50 text-gray-400");
+                    }
+                }
+            });
+        }
+
+        function createInsightItem(title, text, styleClasses) {
+            const item = document.createElement('div');
+            item.className = `p-3 rounded-xl border text-xs leading-relaxed ${styleClasses}`;
+            item.innerHTML = `<strong>${title}</strong><p class="mt-1">${text}</p>`;
+            document.getElementById('insights-feed').appendChild(item);
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
